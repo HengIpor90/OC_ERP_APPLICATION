@@ -71,8 +71,10 @@ trait HasTeams
      */
     public function personalTeam(): ?Team
     {
-        return $this->teams()
-            ->where('is_personal', true)
+        return $this->teamMemberships()
+            ->get()
+            ->map(fn (Membership $membership) => $membership->team)
+            ->filter(fn (?Team $team) => $team?->is_personal === true)
             ->first();
     }
 
@@ -98,7 +100,9 @@ trait HasTeams
      */
     public function belongsToTeam(Team $team): bool
     {
-        return $this->teams()->where('teams.id', $team->id)->exists();
+        return $this->teamMemberships()
+            ->where('team_id', $team->id)
+            ->exists();
     }
 
     /**
@@ -135,8 +139,10 @@ trait HasTeams
      */
     public function toUserTeams(bool $includeCurrent = false): Collection
     {
-        return $this->teams()
+        return $this->teamMemberships()
             ->get()
+            ->map(fn (Membership $membership) => $membership->team)
+            ->filter()
             ->map(fn (Team $team) => ! $includeCurrent && $this->isCurrentTeam($team) ? null : $this->toUserTeam($team))
             ->filter()
             ->values();
@@ -180,9 +186,11 @@ trait HasTeams
 
     public function fallbackTeam(?Team $excluding = null): ?Team
     {
-        return $this->teams()
-            ->when($excluding, fn ($query) => $query->where('teams.id', '!=', $excluding->id))
-            ->orderByRaw('LOWER(teams.name)')
+        return $this->teamMemberships()
+            ->get()
+            ->map(fn (Membership $membership) => $membership->team)
+            ->filter(fn (?Team $team) => $team && (! $excluding || (string) $team->id !== (string) $excluding->id))
+            ->sortBy(fn (Team $team) => mb_strtolower($team->name))
             ->first();
     }
 

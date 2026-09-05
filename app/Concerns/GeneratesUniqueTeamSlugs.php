@@ -10,21 +10,15 @@ trait GeneratesUniqueTeamSlugs
     /**
      * Generate a unique slug for the team.
      */
-    protected static function generateUniqueTeamSlug(string $name, ?int $excludeId = null): string
+    protected static function generateUniqueTeamSlug(string $name, int|string|null $excludeId = null): string
     {
         $defaultSlug = Str::slug($name);
 
-        $query = static::withTrashed()
-            ->where(function ($query) use ($defaultSlug) {
-                $query->where('slug', $defaultSlug)
-                    ->orWhere('slug', 'like', $defaultSlug.'-%');
-            });
-
-        if ($excludeId) {
-            $query->where('id', '!=', $excludeId);
-        }
-
-        $existingSlugs = $query->pluck('slug');
+        $existingSlugs = static::withTrashed()
+            ->get(['id', 'slug'])
+            ->reject(fn (Team $team) => $excludeId !== null && (string) $team->id === (string) $excludeId)
+            ->pluck('slug')
+            ->filter(fn (string $slug) => $slug === $defaultSlug || Str::startsWith($slug, $defaultSlug.'-'));
 
         $maxSuffix = $existingSlugs
             ->map(function (string $slug) use ($defaultSlug): ?int {

@@ -15,13 +15,11 @@ class DashboardController extends Controller
 
         $pendingInvitations = TeamInvitation::query()
             ->with(['inviter', 'team'])
-            ->whereRaw('LOWER(email) = ?', [$email])
+            ->where('email', $email)
             ->whereNull('accepted_at')
-            ->where(fn ($query) => $query
-                ->whereNull('expires_at')
-                ->orWhere('expires_at', '>=', now()))
             ->latest()
             ->get()
+                ->filter(fn (TeamInvitation $invitation) => $invitation->expires_at === null || $invitation->expires_at->isFuture())
             ->map(fn (TeamInvitation $invitation) => [
                 'code' => $invitation->code,
                 'inviterName' => $invitation->inviter->name,

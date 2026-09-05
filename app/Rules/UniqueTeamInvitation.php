@@ -25,7 +25,7 @@ class UniqueTeamInvitation implements ValidationRule
         $email = strtolower($value);
 
         $isMember = $this->team->members()
-            ->whereRaw('LOWER(email) = ?', [$email])
+            ->where('email', $email)
             ->exists();
 
         if ($isMember) {
@@ -35,13 +35,10 @@ class UniqueTeamInvitation implements ValidationRule
         }
 
         $hasPendingInvitation = TeamInvitation::where('team_id', $this->team->id)
-            ->whereRaw('LOWER(email) = ?', [$email])
+            ->where('email', $email)
             ->whereNull('accepted_at')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
-            ->exists();
+                ->get()
+                ->contains(fn (TeamInvitation $invitation) => $invitation->expires_at === null || $invitation->expires_at->isFuture());
 
         if ($hasPendingInvitation) {
             $fail(__('An invitation has already been sent to this email address.'));
